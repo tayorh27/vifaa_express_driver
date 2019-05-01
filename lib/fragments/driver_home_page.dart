@@ -118,6 +118,7 @@ class _DriverPage extends State<DriverPage> {
   Map<PolylineId, Polyline> polylines = <PolylineId, Polyline>{};
   int _polylineIdCounter = 1;
   PolylineId selectedPolyline;
+  String phone_to_call = '';
 
 //  int trip_calculation;
 //  Fares car_fares = null;
@@ -540,7 +541,7 @@ class _DriverPage extends State<DriverPage> {
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 30.0,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
             ),
@@ -679,7 +680,13 @@ class _DriverPage extends State<DriverPage> {
                   Icons.arrow_forward_ios,
                   color: Color(MyColors().primary_color),
                 ),
-                onTap: _callUser,
+                onTap: (){
+                  Map<dynamic, dynamic> cts = currentTripSnapshot.value['trip_details'];
+                  setState(() {
+                    phone_to_call = (button_index > 1) ? '${cts['receiver_number'].toString()}' : '${cts['rider_number'].toString()}';
+                  });
+                  _callUser();
+                },
               ),
               (dialogType == DialogType.driving)
                   ? Divider(
@@ -856,8 +863,7 @@ class _DriverPage extends State<DriverPage> {
   }
 
   void _callUser() {
-    Map<dynamic, dynamic> cts = currentTripSnapshot.value['trip_details'];
-    String url = 'tel:${cts['rider_number'].toString()}';
+    String url = 'tel:$phone_to_call';
     _launchURL(url);
   }
 
