@@ -23,6 +23,7 @@ import 'package:google_maps_webservice/places.dart' as places;
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:location/location.dart' as loc;
+import 'package:latlong/latlong.dart' as dist;
 import 'package:modal_progress_hud/modal_progress_hud.dart';
 import 'package:screen/screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -109,6 +110,8 @@ class _DriverPage extends State<DriverPage> {
 //  String promotion_type = '';
 //  double request_progress = null;
   String trip_distance = '0 km', trip_duration = '0 min';
+  String request_trip_distance = '0 km', request_trip_duration = '0 min';
+
   String total_amount_earned = '0.00'; //₦
   bool getTripDetailsIsCalled = false;
 
@@ -139,6 +142,8 @@ class _DriverPage extends State<DriverPage> {
     });
   }
 
+  double _driverLat = 0, _driverLng = 0;
+
   @override
   void initState() {
     // TODO: implement initState
@@ -150,6 +155,9 @@ class _DriverPage extends State<DriverPage> {
         mLocation.onLocationChanged().listen((loc.LocationData result) {
       double lat = result.latitude;
       double lng = result.longitude;
+
+      _driverLat = result.latitude;
+      _driverLng = result.longitude;
       //print('lat = $lat\nlng = $lng');
       setState(() {
         if (mapController != null) {
@@ -415,75 +423,124 @@ class _DriverPage extends State<DriverPage> {
                 ]))));
   }
 
+  Widget _gapInBetween(double height){
+    return Container(
+      height: height,
+    );
+  }
+
+  double request_value = 0.0;
+  Timer _timer;
+
   Widget _incomingRequestBody(){
     if(hasRequest && requestSnapshot.value != null) {
-      return Opacity(opacity: 0.7, child: Container(
-        child:  Stack(
-      children: <Widget>[
-        Positioned.fill(
-            child: new Container(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                mainAxisSize: MainAxisSize.max,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-
-                ],
-              ),
-              alignment: Alignment.topCenter,
-            )
-        ),
-        new Center(
-            child: new Container(
-          child: Column(
-            children: <Widget>[
-              new Container(
-                height: 100.0,
-                width: 100.0,
-                child: CircularProgressIndicator(
-                  value: null,
-
+      _timer = Timer.periodic(Duration(seconds: 2), (callback) {
+        if (request_value == 1.1) {
+          _timer.cancel();
+        }
+        request_value = request_value + 0.1;
+      });
+      FavoritePlaces fp = FavoritePlaces.fromJson(requestSnapshot.value['current_location']);
+      getRequestDistanceDuration(double.parse(fp.latitude), double.parse(fp.latitude));
+//      final dist.Distance distance = new dist.Distance();
+//      final num km = distance.as(
+//          dist.LengthUnit.Kilometer,
+//          new dist.LatLng(_driverLat,
+//              _driverLng), //double.parse(current_location.latitude
+//          new dist.LatLng(double.parse(fp.latitude), double.parse(fp.latitude)));
+      return Opacity(opacity: 0.9, child:
+      Container(
+        color: Color(MyColors().wrapper_color),
+        child: Stack(
+          children: <Widget>[
+            new Center(
+                child: new Container(
+                  child: Column(
+                    children: <Widget>[
+                      _gapInBetween(50.0),
+                      Text('INCOMING REQUEST', style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20.0,
+                          fontWeight: FontWeight.w600),
+                        softWrap: true,
+                        textAlign: TextAlign.center,),
+                      _gapInBetween(20.0),
+                      Text(fp.loc_name, style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20.0,
+                          fontWeight: FontWeight.w600),
+                        softWrap: true,
+                        textAlign: TextAlign.center,),
+                      _gapInBetween(20.0),
+                      Row(crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        mainAxisSize: MainAxisSize.max,
+                        children: <Widget>[
+                          Text(request_trip_distance, style: TextStyle(color: Colors.white,
+                              fontSize: 20.0,
+                              fontWeight: FontWeight.w600),
+                            softWrap: true,
+                            textAlign: TextAlign.center,),
+                          Text(request_trip_duration, style: TextStyle(color: Colors.white,
+                              fontSize: 20.0,
+                              fontWeight: FontWeight.w600),
+                            softWrap: true,
+                            textAlign: TextAlign.center,),
+                        ],),
+                      _gapInBetween(20.0),
+                      new Container(
+                        height: 100.0,
+                        width: 100.0,
+                        margin: EdgeInsets.all(25.0),
+                        child: CircularProgressIndicator(
+                          value: request_value,
+                          strokeWidth: 12.0,
+                        ),
+                      ),
+                      _gapInBetween(20.0),
+                      Text('You have 10seconds to accept this request.',
+                        style: TextStyle(color: Colors.white,
+                            fontSize: 18.0,
+                            fontWeight: FontWeight.w600),
+                        textAlign: TextAlign.center,)
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                )),
+            new Container(
+              child: new Container(
+                margin: EdgeInsets.only(left: 20.0, right: 20.0, bottom: 20.0),
+                child: Padding(
+                  padding: EdgeInsets.only(top: 0.0, left: 0.0, right: 0.0),
+                  child: new RaisedButton(
+                    child: new Text('ACCEPT TRIP',
+                        style: new TextStyle(
+                            fontSize: 18.0,
+                            color: Color(MyColors().button_text_color))),
+                    color: Color(MyColors().secondary_color),
+                    disabledColor: Colors.grey,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(30.0)),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _inAsyncCall = true;
+                        hasRequest = false;
+                      });
+                      _tripAcceptedByDriver(requestSnapshot.value);
+                      _checkIncomingRequest(true);
+                    },
+                    //buttonDisabled
+                    padding: EdgeInsets.all(15.0),
+                  ),
                 ),
               ),
-              Text('You have 10seconds to accept this request.')
-            ],
-          ),
-          alignment: Alignment.center,
-        )),
-        new Container(
-          child: new Container(
-            margin: EdgeInsets.only(left: 20.0, right: 20.0),
-            child: Padding(
-              padding: EdgeInsets.only(top: 0.0, left: 0.0, right: 0.0),
-              child: new RaisedButton(
-                child: new Text('ACCEPT TRIP',
-                    style: new TextStyle(
-                        fontSize: 18.0,
-                        color: Color(MyColors().button_text_color))),
-                color: Color(MyColors().secondary_color),
-                disabledColor: Colors.grey,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(30.0)),
-                ),
-                onPressed: (){
-                  setState(() {
-                    _inAsyncCall = true;
-                    hasRequest = false;
-                  });
-                  _tripAcceptedByDriver(requestSnapshot.value);
-                  _checkIncomingRequest(true);
-                },
-                //buttonDisabled
-                padding: EdgeInsets.all(15.0),
-              ),
+              alignment: Alignment.bottomCenter,
             ),
-          ),
-          alignment: Alignment.bottomCenter,
+          ],
         ),
-      ],
-    ),
       ),);
-    }else{
+    }else {
       return Text('');
     }
   }
@@ -1471,6 +1528,35 @@ class _DriverPage extends State<DriverPage> {
 
   Future<ByteData> loadAsset() async {
     return await rootBundle.load('assets/audio/rush.mp3');
+  }
+
+  void getRequestDistanceDuration(double _fpLat, double _fpLng) {
+    try {
+      String url =
+          'https://maps.googleapis.com/maps/api/distancematrix/json?origins=$_driverLat,$_driverLng&destinations=$_fpLat,$_fpLng&key=$api_key';
+      //print(url);
+      http.get(url).then((res) {
+        //new Utils().neverSatisfied(context, 'response', '${res.body}');
+        //print(res.body);
+        Map<String, dynamic> resp = json.decode(res.body);
+        String status = resp['status'];
+        //new Utils().neverSatisfied(context, 'status', '$status');
+        if (status != null && status == 'OK') {
+          Map<String, dynamic> result = resp['rows'][0];
+          Map<String, dynamic> element = result['elements'][0];
+          Map<String, dynamic> distance = element['distance'];
+          Map<String, dynamic> duration = element['duration'];
+          //new Utils().neverSatisfied(context, 'distance', distance['text']);
+          setState(() {
+            request_trip_distance = distance['text'];
+            request_trip_duration = duration['text'];
+          });
+        } else {
+        }
+      });
+    } catch (e) {
+      print('${e.toString()}');
+    }
   }
 
   Future<void> playNotification() async {
